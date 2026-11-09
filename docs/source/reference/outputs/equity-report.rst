@@ -89,6 +89,26 @@ whose lookup failed and value left unmodelled; with ``default_vulnerability_ids`
 or fallback vulnerability; locations without coordinates; and, from ``GeocodeQuality``, mean geocode quality and the
 share below ``geocode_quality_threshold``. Here ``group_by`` columns are location or exposure attribute columns.
 
+Comparing scenarios
+-------------------
+
+To see who gains and who loses between two analyses, such as a base run and a mitigation programme, a
+climate-conditioned event set or a policy change, run:
+
+.. code-block:: bash
+
+    oasislmf model compare -r <scenario_run_dir> -b <base_run_dir> [-a analysis_settings.json]
+
+Both runs are read with the same ``equity_report`` settings (by default those saved in the scenario's run
+directory), and their rows are grouped and then matched by group value, so the runs may have different summary ids
+or locations. ``<runtype>_S<summary_set>_compare-aal.csv`` has, per group, the rows, value and AAL in each run,
+``aal_change`` and ``aal_change_pct``, and ``share_of_aal_change`` next to ``aal_share_base``. A group that carried
+two thirds of the base loss but gets a third of the reduction is easy to spot. With an ``income_column`` it also has
+the median AAL-to-income ratio in each run. A group is suppressed when it has fewer than ``min_group_size`` rows in
+either run. When both runs have an EPT (``ept_*`` outputs), ``..._compare-ep.csv`` compares the portfolio's loss at
+each return period. The tables are written to ``<scenario_run_dir>/output/compare`` unless
+``--compare-report-dir`` is given.
+
 .. note::
 
     Group results are only as good as the attribute table and the model. Use area-level data rather than data

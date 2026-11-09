@@ -125,6 +125,17 @@ class EquityReportCmd(OasisComputationCommand):
     computation_name = 'EquityReport'
 
 
+class CompareCmd(OasisComputationCommand):
+    """Compare a scenario run with a base run, group by group: who gains and who loses.
+
+    Reads both runs' ORD outputs and the ``equity_report`` section of the analysis settings. The command line
+    arguments can be supplied in the configuration file (``oasislmf.json`` by default or specified with the
+    ``--config`` flag).
+    """
+    formatter_class = RawDescriptionHelpFormatter
+    computation_name = 'CompareScenarios'
+
+
 class GenerateComputationSettingsJsonSchema(OasisComputationCommand):
     """Generate a json schema to validate the computation settings part of oed settings"""
     formatter_class = RawDescriptionHelpFormatter
@@ -157,4 +168,5 @@ class ModelCmd(OasisBaseCommand):
         'check': CheckCmd,
         'run-postanalysis': RunPostAnalysisCmd,
         'equity-report': EquityReportCmd,
+        'compare': CompareCmd,
     }
