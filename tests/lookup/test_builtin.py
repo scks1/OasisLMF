@@ -1,3 +1,4 @@
+import re
 from collections import OrderedDict
 from pathlib import Path
 
@@ -658,3 +659,53 @@ def test_combine_and_raises_when_child_columns_are_missing():
     locations = pd.DataFrame({"loc_id": [1], "peril_id": ["WTC"], "coverage_type": [1]})  # no AutoCode
     with pytest.raises(OasisException, match="by_autocode"):
         AutoLookup(config=config).process_locations(locations)
+
+
+def test_process_locations_logs_each_step_with_timings(vulnerability_dict_path, german_locations, caplog):
+    """Each step logs when it is created and when it runs, with how long it took (#2202)."""
+    config = _vulnerability_merge_config(vulnerability_dict_path)
+    with caplog.at_level("INFO", logger="oasislmf.lookup.builtin"):
+        Lookup(config=config).process_locations(german_locations)
+    messages = [r.getMessage() for r in caplog.records if r.name == "oasislmf.lookup.builtin"]
+    expected = [
+        r"Creating 'areaperil' \(prepare\) lookup step\.\.\.",
+        r"Created 'areaperil' \(prepare\) lookup step in \d+\.\d\ds\.",
+        r"Running 'areaperil' \(prepare\) lookup step on 2 rows\.\.\.",
+        r"Completed 'areaperil' \(prepare\) lookup step in \d+\.\d\ds\.",
+        r"Creating 'vulnerability' \(merge\) lookup step\.\.\.",
+        r"Created 'vulnerability' \(merge\) lookup step in \d+\.\d\ds\.",
+        r"Running 'vulnerability' \(merge\) lookup step on 2 rows\.\.\.",
+        r"Completed 'vulnerability' \(merge\) lookup step in \d+\.\d\ds\.",
+    ]
+    step_messages = [m for m in messages if "lookup step" in m]
+    assert len(step_messages) == len(expected), step_messages
+    for pattern, message in zip(expected, step_messages):
+        assert re.fullmatch(pattern, message), message
+
+
+def test_combine_logs_creation_of_child_steps(caplog):
+    """A combine step's children are created (and logged) while the parent is being built."""
+    config = {
+        "strategy": ["areaperil", "vulnerability"],
+        "step_definition": {
+            "areaperil": {"type": "prepare", "parameters": {"area_peril_id": {"default": 1}}},
+            "vulnerability": {
+                "type": "combine",
+                "columns": ["peril_id", "coverage_type"],
+                "parameters": {"id_columns": ["vulnerability_id"], "strategy": ["fallback"]},
+            },
+            "fallback": {"type": "prepare", "columns": ["peril_id"], "parameters": {"vulnerability_id": {"default": 7}}},
+        },
+    }
+    locations = pd.DataFrame({"loc_id": [1], "peril_id": ["WTC"], "coverage_type": [1]})
+    with caplog.at_level("INFO", logger="oasislmf.lookup.builtin"):
+        Lookup(config=config).process_locations(locations)
+    step_messages = [r.getMessage().split(" lookup step")[0] for r in caplog.records if "lookup step" in r.getMessage()]
+    assert step_messages[-6:] == [
+        "Creating 'vulnerability' (combine)",
+        "Creating 'fallback' (prepare)",
+        "Created 'fallback' (prepare)",
+        "Created 'vulnerability' (combine)",
+        "Running 'vulnerability' (combine)",
+        "Completed 'vulnerability' (combine)",
+    ]

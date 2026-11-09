@@ -292,6 +292,23 @@ class otherwise this will try and run and the ``build_simple_add`` function will
 that we have signposted our ``["example"]`` column name in the ``"columns"`` field. This is to ensure that our ``example`` 
 field is not wiped at the end of the process.
 
+At ``INFO`` level the lookup logs each step as it is created and as it runs, with the time taken, which helps to spot
+slow or unneeded steps:
+
+.. code-block:: text
+
+    Creating 'areaperil' (rtree) lookup step...
+    Created 'areaperil' (rtree) lookup step in 30.12s.
+    Running 'areaperil' (rtree) lookup step on 10000 rows...
+    Completed 'areaperil' (rtree) lookup step in 5.03s.
+
+The steps of a ``combine`` are created while their parent is created; only the steps listed in ``"strategy"`` log a
+run. With multiprocessing enabled, each worker process creates (and logs) its own copy of the steps, and the run lines
+appear once for each chunk of locations.
+
+.. versionadded:: NEXT
+   Step creation and run logging.
+
 |
 
 .. _built_in_functions_keys:

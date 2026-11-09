@@ -47,6 +47,7 @@ except ImportError:
 import logging
 import math
 import re
+import time
 
 from oasislmf.lookup.base import AbstractBasicKeyLookup, MultiprocLookupMixin
 from oasislmf.utils.exceptions import OasisException
@@ -372,6 +373,9 @@ class Lookup(AbstractBasicKeyLookup, MultiprocLookupMixin):
         if hasattr(self, step_name):
             step_function = getattr(self, step_name)
         else:
+            step_type = step_config['type']
+            logger.info("Creating '%s' (%s) lookup step...", step_name, step_type)
+            start = time.perf_counter()
             if step_config['type'] == 'combine':  # we need to build the child function
                 if function_being_set is None:  # make sure we catch cyclic strategy definition
                     function_being_set = {step_name}
@@ -391,8 +395,9 @@ class Lookup(AbstractBasicKeyLookup, MultiprocLookupMixin):
                                       'columns': set(child_step_config.get("columns", []))})
                 step_config['parameters']['strategy'] = functions
 
-            step_function = getattr(self, f"build_{step_config['type']}")(**step_config['parameters'])
+            step_function = getattr(self, f"build_{step_type}")(**step_config['parameters'])
             setattr(self, step_name, step_function)
+            logger.info("Created '%s' (%s) lookup step in %.2fs.", step_name, step_type, time.perf_counter() - start)
         return step_function
 
     def process_locations(self, locations):
@@ -425,7 +430,11 @@ class Lookup(AbstractBasicKeyLookup, MultiprocLookupMixin):
                 raise OasisException(
                     f"Key Server Issue: missing columns {needed_column.difference(locations.columns)} for step {step_name}")
             step_function = self.set_step_function(step_name, step_config)
+            step_type = step_config.get('type', 'custom')
+            logger.info("Running '%s' (%s) lookup step on %d rows...", step_name, step_type, len(locations))
+            start = time.perf_counter()
             locations = step_function(locations)
+            logger.info("Completed '%s' (%s) lookup step in %.2fs.", step_name, step_type, time.perf_counter() - start)
 
         key_columns = [
             'loc_id', 'peril_id', 'coverage_type', 'area_peril_id',
