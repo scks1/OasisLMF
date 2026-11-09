@@ -22,8 +22,11 @@ DEFAULTS = {
     'premiums': None,
     'data_gaps': None,
     'loss_sharing': None,
+    'public_assistance': None,
 }
 LOSS_SHARING_PERSPECTIVES = ('gul', 'il', 'ri')
+ASSISTANCE_DEFAULTS = {'deductible': 0.0, 'share': 1.0, 'limit': None, 'income_threshold': None,
+                       'return_periods': DEFAULT_RETURN_PERIODS}
 DATA_GAP_DEFAULTS = {'default_vulnerability_ids': [], 'geocode_quality_threshold': None}
 WEIGHTING_DEFAULTS = {'eta': 1.5, 'reference_income': 'mean', 'return_periods': DEFAULT_RETURN_PERIODS}
 PREMIUM_DEFAULTS = {'loading': 0.0, 'schemes': None}
@@ -177,4 +180,28 @@ def equity_report_settings(settings):
         checked['loss_sharing'] = {'summary_sets': sets}
     else:
         checked['loss_sharing'] = None
+
+    assistance = checked['public_assistance']
+    if assistance:
+        assistance = {} if assistance is True else assistance
+        section = f"{SETTINGS_KEY}.public_assistance"
+        _check_keys(section, assistance, ASSISTANCE_DEFAULTS)
+        assistance = {**ASSISTANCE_DEFAULTS, **assistance}
+        _positive(section, 'deductible', assistance['deductible'], allow_zero=True)
+        _positive(section, 'share', assistance['share'])
+        if assistance['share'] > 1:
+            raise OasisException(f"{section} 'share' is the share of the retained loss paid, between 0 and 1, got {assistance['share']!r}")
+        if assistance['limit'] is not None:
+            _positive(section, 'limit', assistance['limit'])
+        if assistance['income_threshold'] is not None:
+            if checked['income_column'] is None:
+                raise OasisException(f"{section} 'income_threshold' needs {SETTINGS_KEY}.income_column")
+            _positive(section, 'income_threshold', assistance['income_threshold'])
+        periods = assistance['return_periods']
+        if not periods or not all(isinstance(p, (int, float)) and not isinstance(p, bool) and p > 0 for p in periods):
+            raise OasisException(f"{section} 'return_periods' must be a list of positive numbers, got {periods!r}")
+        assistance['return_periods'] = sorted(set(periods))
+        checked['public_assistance'] = assistance
+    else:
+        checked['public_assistance'] = None
     return checked

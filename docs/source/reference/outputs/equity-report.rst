@@ -93,6 +93,23 @@ columns. By default it is the report's ``summary_set``, and ``"loss_sharing": {"
 another. When the summary sets are grouped by location, rows are matched across perspectives and, with an
 ``income_column``, the table also gives the median retained AAL as a share of income.
 
+The public-assistance tables (with ``public_assistance``) show what a programme paying towards the losses people
+keep would cost and whom it would reach. For each event, each eligible row is paid ``share`` (default 1) of its
+retained loss (``gul - il``, or the whole ground-up loss without insured outputs) above ``deductible`` (default 0), up
+to ``limit``. With ``income_threshold``, only rows with a known income below it are eligible.
+``equity-public-assistance.csv`` gives, per group, the expected annual retained loss and assistance, the share of
+retained loss covered, the group's share of the programme's spending next to its share of retained loss, and, with an
+income column, the median retained loss as a share of income before and after assistance.
+``equity-public-assistance-budget-ep.csv`` gives the programme's OEP and AEP spending at ``return_periods``. The rows
+must match between the ``gul`` and ``il`` summary sets (for example, both grouped by ``LocNumber``). The programme's
+terms are applied to each sample when both have a sample PLT (``plt_sample``) and the analysis settings give
+``number_of_samples``. Otherwise they are applied to each event's mean loss (``plt_moment``), which understates what a
+programme with a deductible or limit pays.
+
+.. code-block:: json
+
+    "public_assistance": {"deductible": 1000, "share": 0.75, "limit": 25000, "income_threshold": 30000}
+
 The data-gap audit, ``equity-data-gaps.csv`` (with ``data_gaps``), shows where the model sees less of a group's
 exposure. It groups the run's locations, read from the run's ``input`` directory, and reports per group: locations
 whose lookup failed and value left unmodelled; with ``default_vulnerability_ids``, locations and value on a default

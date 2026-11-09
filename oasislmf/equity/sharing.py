@@ -13,11 +13,12 @@ summary-info columns they share (other than ``summary_id``), so with summary set
 also known for each location, and income-based measures can be given.
 """
 
-__all__ = ['loss_sharing_table']
+__all__ = ['loss_sharing_table', 'perspective_rows', 'summary_id_map']
 
 import logging
 
 import numpy as np
+import pandas as pd
 
 from ..utils.exceptions import OasisException
 from .rows import by_group, group_label, report_rows, suppress_small_groups
@@ -27,8 +28,24 @@ logger = logging.getLogger(__name__)
 PERSPECTIVES = ('gul', 'il', 'ri')
 
 
-def _perspective_rows(output_dir, settings, runtype, summary_set, sample_type):
-    # Only the ground-up rows need the income column; the others are matched to them
+ROW_VALUE_COLUMNS = ('SummaryId', 'tiv', 'aal', 'aal_to_tiv', 'income', 'aal_to_income')
+
+
+def perspective_rows(output_dir, settings, runtype, summary_set, sample_type):
+    """Return the report rows of one perspective's summary set, with group values as text.
+
+    Only the ground-up rows need the income column; the other perspectives are matched to them.
+
+    Args:
+        output_dir (str): Analysis output directory.
+        settings (dict): Checked ``equity_report`` settings.
+        runtype (str): Perspective, ``gul``, ``il`` or ``ri``.
+        summary_set (int): Summary set id.
+        sample_type (int): ALT sample type.
+
+    Returns:
+        pandas.DataFrame: Rows from :func:`oasislmf.equity.rows.report_rows`.
+    """
     income_column = settings['income_column'] if runtype == 'gul' else None
     rows, _ = report_rows(output_dir, {**settings, 'runtype': runtype, 'summary_set': summary_set,
                                        'sample_type': sample_type, 'income_column': income_column})
@@ -37,20 +54,38 @@ def _perspective_rows(output_dir, settings, runtype, summary_set, sample_type):
     return rows
 
 
-def _match_rows(gul, other, name):
-    """Return ``other``'s AAL for each ``gul`` row, or None when the rows don't match one to one."""
-    keys = [c for c in gul.columns.intersection(other.columns)
-            if c not in ('SummaryId', 'tiv', 'aal', 'aal_to_tiv', 'income', 'aal_to_income')]
+def summary_id_map(gul, other):
+    """Map ``other``'s summary ids to the ground-up rows with the same summary-info values.
+
+    Args:
+        gul (pandas.DataFrame): Ground-up rows.
+        other (pandas.DataFrame): Rows of another perspective.
+
+    Returns:
+        pandas.Series or None: Ground-up ``SummaryId`` indexed by ``other``'s ``SummaryId`` (rows with no ground-up match
+        are left out), or None when the two have no shared summary-info column that picks out one row each.
+    """
+    keys = [c for c in gul.columns.intersection(other.columns) if c not in ROW_VALUE_COLUMNS]
     if not keys or other.duplicated(keys).any() or gul.duplicated(keys).any():
         return None
-    left = gul[keys].astype(str)
-    right = other[keys].astype(str).assign(aal=other['aal'].to_numpy())
-    matched = left.merge(right, on=keys, how='left', validate='one_to_one')
-    unmatched = int(matched['aal'].isna().sum())
+    left = gul[keys].astype(str).assign(GulSummaryId=gul['SummaryId'].to_numpy())
+    right = other[keys].astype(str).assign(SummaryId=other['SummaryId'].to_numpy())
+    matched = right.merge(left, on=keys, how='inner', validate='one_to_one')
+    return pd.Series(matched['GulSummaryId'].to_numpy(), index=matched['SummaryId'].to_numpy())
+
+
+def _match_rows(gul, other, name):
+    """Return ``other``'s AAL for each ``gul`` row, or None when the rows don't match one to one."""
+    id_map = summary_id_map(gul, other)
+    if id_map is None:
+        return None
+    by_gul_id = other.set_index('SummaryId')['aal'].reindex(id_map.index).groupby(id_map.to_numpy()).sum()
+    matched = gul['SummaryId'].map(by_gul_id)
+    unmatched = int(matched.isna().sum())
     if unmatched:
         logger.info("loss sharing: %d of %d ground-up rows have no %s row; they count as having no %s loss",
                     unmatched, len(gul), name, name)
-    return matched['aal'].fillna(0.0).to_numpy()
+    return matched.fillna(0.0).to_numpy()
 
 
 def loss_sharing_table(output_dir, settings, sample_type):
@@ -81,10 +116,10 @@ def loss_sharing_table(output_dir, settings, sample_type):
     """
     sets = settings['loss_sharing']['summary_sets']
     group_by = settings['group_by']
-    gul = _perspective_rows(output_dir, settings, 'gul', sets['gul'], sample_type)
-    il = _perspective_rows(output_dir, settings, 'il', sets['il'], sample_type)
+    gul = perspective_rows(output_dir, settings, 'gul', sets['gul'], sample_type)
+    il = perspective_rows(output_dir, settings, 'il', sets['il'], sample_type)
     try:
-        ri = _perspective_rows(output_dir, settings, 'ri', sets['ri'], sample_type)
+        ri = perspective_rows(output_dir, settings, 'ri', sets['ri'], sample_type)
     except OasisException:
         ri = None
         logger.info("loss sharing: no ri_S%s outputs, so insurers' losses are shown before reinsurance", sets['ri'])
