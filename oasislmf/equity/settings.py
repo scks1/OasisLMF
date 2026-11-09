@@ -21,7 +21,9 @@ DEFAULTS = {
     'equity_weighting': None,
     'premiums': None,
     'data_gaps': None,
+    'loss_sharing': None,
 }
+LOSS_SHARING_PERSPECTIVES = ('gul', 'il', 'ri')
 DATA_GAP_DEFAULTS = {'default_vulnerability_ids': [], 'geocode_quality_threshold': None}
 WEIGHTING_DEFAULTS = {'eta': 1.5, 'reference_income': 'mean', 'return_periods': DEFAULT_RETURN_PERIODS}
 PREMIUM_DEFAULTS = {'loading': 0.0, 'schemes': None}
@@ -158,4 +160,21 @@ def equity_report_settings(settings):
         checked['data_gaps'] = gaps
     else:
         checked['data_gaps'] = None
+
+    sharing = checked['loss_sharing']
+    if sharing:
+        sharing = {} if sharing is True else sharing
+        section = f"{SETTINGS_KEY}.loss_sharing"
+        _check_keys(section, sharing, {'summary_sets'})
+        sets = sharing.get('summary_sets') or {}
+        if not isinstance(sets, dict):
+            raise OasisException(f"{section} 'summary_sets' must map perspectives to summary set ids, got {sets!r}")
+        _check_keys(f"{section}.summary_sets", sets, LOSS_SHARING_PERSPECTIVES)
+        sets = {p: sets.get(p, checked['summary_set']) for p in LOSS_SHARING_PERSPECTIVES}
+        for perspective, summary_set in sets.items():
+            if not isinstance(summary_set, int) or isinstance(summary_set, bool) or summary_set < 1:
+                raise OasisException(f"{section} summary set for '{perspective}' must be a summary set id, got {summary_set!r}")
+        checked['loss_sharing'] = {'summary_sets': sets}
+    else:
+        checked['loss_sharing'] = None
     return checked

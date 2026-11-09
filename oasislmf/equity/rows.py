@@ -1,6 +1,6 @@
 """Build the table of report rows: one per summary id, with its AAL, value, income and group."""
 
-__all__ = ['report_rows', 'by_group', 'suppress_small_groups', 'TOTAL_LABEL']
+__all__ = ['report_rows', 'by_group', 'group_label', 'suppress_small_groups', 'TOTAL_LABEL']
 
 import logging
 
@@ -68,6 +68,24 @@ def report_rows(output_dir, settings):
         rows['income'] = income
         rows['aal_to_income'] = rows['aal'] / income
     return rows, sample_type
+
+
+def group_label(value):
+    """Return a group value as text, so ``1``, ``1.0`` and ``'1'`` (from csv or parquet summary-info) are one group.
+
+    Args:
+        value: A group column value.
+
+    Returns:
+        str: The value as text; ``''`` for a missing value.
+    """
+    if isinstance(value, str):
+        return value
+    if pd.isna(value):
+        return ''
+    if isinstance(value, (float, np.floating)) and float(value).is_integer():
+        return str(int(value))
+    return str(value)
 
 
 def by_group(rows, group_by, aggregate):

@@ -16,7 +16,7 @@ import pandas as pd
 
 from ..utils.exceptions import OasisException
 from .ord import read_ord
-from .rows import TOTAL_LABEL, by_group, report_rows
+from .rows import TOTAL_LABEL, by_group, group_label, report_rows
 from .settings import equity_report_settings
 
 logger = logging.getLogger(__name__)
@@ -36,18 +36,8 @@ def _group_summary(rows, settings):
     table = by_group(rows, settings['group_by'], aggregate)
     # Group values are matched across runs as text, so 1, 1.0 and '1' (csv vs parquet summary-info) are one group
     for column in settings['group_by']:
-        table[column] = table[column].map(_group_label)
+        table[column] = table[column].map(group_label)
     return table
-
-
-def _group_label(value):
-    if isinstance(value, str):
-        return value
-    if pd.isna(value):
-        return ''
-    if isinstance(value, (float, np.floating)) and float(value).is_integer():
-        return str(int(value))
-    return str(value)
 
 
 def compare_table(base_rows, scenario_rows, settings):

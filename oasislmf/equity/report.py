@@ -15,6 +15,7 @@ from .ord import ord_path
 from .premiums import premium_table
 from .rows import report_rows
 from .settings import equity_report_settings
+from .sharing import loss_sharing_table
 from .weighting import equity_weights, weighted_aal_table, weighted_ep_table
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,9 @@ def run_equity_report(output_dir, analysis_settings, report_dir=None, input_dir=
 
     if settings['premiums']:
         tables[f'{stem}-premiums.csv'] = premium_table(rows, settings)
+
+    if settings['loss_sharing']:
+        tables['equity-loss-sharing.csv'] = loss_sharing_table(output_dir, settings, sample_type)
 
     if settings['data_gaps']:
         input_dir = input_dir or os.path.join(os.path.dirname(os.path.abspath(output_dir)), 'input')

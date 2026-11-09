@@ -34,7 +34,8 @@ postcode, and must be one of the summary set's ``oed_fields``.
         "min_group_size": 10,
         "equity_weighting": {"eta": 1.5},
         "premiums": {"loading": 0.3, "schemes": ["risk_based", {"type": "capped", "cap": 0.02}]},
-        "data_gaps": {"default_vulnerability_ids": [999], "geocode_quality_threshold": 0.7}
+        "data_gaps": {"default_vulnerability_ids": [999], "geocode_quality_threshold": 0.7},
+        "loss_sharing": true
     }
 
 Settings
@@ -82,6 +83,15 @@ has one row per group and a total row ``All``.
     ``income_threshold`` get ``discount`` off). ``capped`` and ``means_tested`` are paid for by a public ``subsidy``
     (default) or a ``surcharge`` on the other rows, which never pushes a row past its own cap. Schemes use only AAL,
     value and income.
+
+The loss-sharing table, ``equity-loss-sharing.csv`` (with ``loss_sharing``), shows who bears each group's ground-up
+loss. It compares the group's AAL in the ``gul``, ``il`` and, if there are reinsurance outputs, ``ri`` outputs:
+``retained_aal`` (``gul - il``) is kept by policyholders, through deductibles, losses above limits and locations
+with no insurance; ``insurer_net_aal`` is paid by insurers after reinsurance; and ``ceded_aal`` (``il - ri``) is paid
+by reinsurers, each also as a share of the ground-up loss. Each perspective's summary set needs the ``group_by``
+columns. By default it is the report's ``summary_set``, and ``"loss_sharing": {"summary_sets": {"il": 2}}`` picks
+another. When the summary sets are grouped by location, rows are matched across perspectives and, with an
+``income_column``, the table also gives the median retained AAL as a share of income.
 
 The data-gap audit, ``equity-data-gaps.csv`` (with ``data_gaps``), shows where the model sees less of a group's
 exposure. It groups the run's locations, read from the run's ``input`` directory, and reports per group: locations
