@@ -14,6 +14,7 @@ how locations are joined to your geometry file — is covered in
 installation
 building-and-running-models
 logging-configuration
+verifying-runs
 model-development-kit
 api-client
 ground-up-losses

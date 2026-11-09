@@ -16,6 +16,7 @@ from ..hooks.post_analysis import PostAnalysis
 from ..hooks.post_file_gen import PostFileGen
 from ..hooks.pre_loss import PreLoss
 from .check import CheckModel
+from .manifest import write_run_manifest
 
 from ...utils.data import get_exposure_data
 from ...utils.inputs import str2bool
@@ -40,6 +41,10 @@ class RunModel(ComputationStep):
         {'name': 'model_check', 'type': str2bool, 'const': True, 'nargs': '?', 'default': False,
          'help': 'Check the generated Oasis files against the model data (as `oasislmf model check`) before generating losses, '
                  'stopping the run on errors'},
+        {'name': 'run_manifest', 'type': str2bool, 'const': True, 'nargs': '?', 'default': False,
+         'help': 'Write run_manifest.json (hashes of the inputs, outputs and settings, and the versions used) at the end of the run'},
+        {'name': 'run_manifest_model_data', 'type': str2bool, 'const': True, 'nargs': '?', 'default': False,
+         'help': 'With --run-manifest, also hash every model data file (slow for large models)'},
     ]
     # Add params from each sub command not in 'step_params'
     chained_commands = [
@@ -100,6 +105,9 @@ class RunModel(ComputationStep):
             for cmd in cmds:
                 cmd[0](**cmd[1]).run()
                 pbar.update(1)
+
+        if self.run_manifest:
+            write_run_manifest(self, self.model_run_dir)
 
         self.logger.info('\nModel run completed successfully in {}'.format(self.model_run_dir))
 

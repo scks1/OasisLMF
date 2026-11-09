@@ -52,7 +52,7 @@ class TestRunModel(ComputationChecker):
 
     def test_args__default_combine(self):
         expt_combined_args = self.combine_args([
-            {'model_check': False},
+            {'model_check': False, 'run_manifest': False, 'run_manifest_model_data': False},
             self.pre_hook_args,
             self.gen_files_args,
             self.post_file_gen_args,

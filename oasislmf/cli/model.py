@@ -114,6 +114,26 @@ class RunPostAnalysisCmd(OasisComputationCommand):
     computation_name = 'PostAnalysis'
 
 
+class ManifestCmd(OasisComputationCommand):
+    """Write run_manifest.json for a finished run: the hashes of its inputs, outputs and settings, and the versions used.
+
+    The command line arguments can be supplied in the configuration file
+    (``oasislmf.json`` by default or specified with the ``--config`` flag).
+    """
+    formatter_class = RawDescriptionHelpFormatter
+    computation_name = 'WriteRunManifest'
+
+
+class VerifyCmd(OasisComputationCommand):
+    """Check a run's inputs, outputs and settings against its manifest, or against another run's.
+
+    Exits with an error if any file differs. The command line arguments can be supplied in the configuration file
+    (``oasislmf.json`` by default or specified with the ``--config`` flag).
+    """
+    formatter_class = RawDescriptionHelpFormatter
+    computation_name = 'VerifyRun'
+
+
 class GenerateComputationSettingsJsonSchema(OasisComputationCommand):
     """Generate a json schema to validate the computation settings part of oed settings"""
     formatter_class = RawDescriptionHelpFormatter
@@ -144,4 +164,6 @@ class ModelCmd(OasisBaseCommand):
         'run': RunCmd,
         'check': CheckCmd,
         'run-postanalysis': RunPostAnalysisCmd,
+        'manifest': ManifestCmd,
+        'verify': VerifyCmd,
     }
