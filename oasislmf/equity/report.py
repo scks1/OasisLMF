@@ -10,6 +10,7 @@ import pandas as pd
 
 from ..utils.exceptions import OasisException
 from .assistance import assistance_tables
+from .basis import basis_risk_table
 from .burden import burden_table
 from .data_gaps import data_gap_table
 from .ord import ord_path
@@ -81,6 +82,9 @@ def run_equity_report(output_dir, analysis_settings, report_dir=None, input_dir=
         assistance, budget = assistance_tables(output_dir, settings, sample_type, analysis_settings)
         tables['equity-public-assistance.csv'] = assistance
         tables['equity-public-assistance-budget-ep.csv'] = budget
+
+    if settings['basis_risk']:
+        tables['equity-basis-risk.csv'] = basis_risk_table(output_dir, settings, sample_type, analysis_settings)
 
     if settings['data_gaps']:
         input_dir = input_dir or os.path.join(os.path.dirname(os.path.abspath(output_dir)), 'input')

@@ -110,6 +110,16 @@ programme with a deductible or limit pays.
 
     "public_assistance": {"deductible": 1000, "share": 0.75, "limit": 25000, "income_threshold": 30000}
 
+The basis-risk table, ``equity-basis-risk.csv`` (with ``basis_risk``), shows how well payouts follow losses. It
+matters most for step, parametric and index policies (such as calcrules 28, 281 and 32), which pay on a trigger
+rather than on the loss. For each event (and sample) and row it compares the ground-up loss with the ``il`` payout.
+An event is a loss event when the loss is above ``loss_threshold`` (default 0), and paid when the payout is above
+``payout_threshold`` (default 0). Per group it gives the expected number of loss events a year and the share of them
+left unpaid, the loss in unpaid events, the shortfall (loss not paid), and payouts made with no loss event and
+overpayment. With an income column it also gives the median shortfall as a share of income. As with public
+assistance, the gul and il rows must match, and sample PLTs are used when available. On mean losses, a trigger that
+pays in some samples and not others looks as if it always pays part of the loss.
+
 The data-gap audit, ``equity-data-gaps.csv`` (with ``data_gaps``), shows where the model sees less of a group's
 exposure. It groups the run's locations, read from the run's ``input`` directory, and reports per group: locations
 whose lookup failed and value left unmodelled; with ``default_vulnerability_ids``, locations and value on a default

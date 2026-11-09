@@ -23,8 +23,10 @@ DEFAULTS = {
     'data_gaps': None,
     'loss_sharing': None,
     'public_assistance': None,
+    'basis_risk': None,
 }
 LOSS_SHARING_PERSPECTIVES = ('gul', 'il', 'ri')
+BASIS_RISK_DEFAULTS = {'loss_threshold': 0.0, 'payout_threshold': 0.0}
 ASSISTANCE_DEFAULTS = {'deductible': 0.0, 'share': 1.0, 'limit': None, 'income_threshold': None,
                        'return_periods': DEFAULT_RETURN_PERIODS}
 DATA_GAP_DEFAULTS = {'default_vulnerability_ids': [], 'geocode_quality_threshold': None}
@@ -204,4 +206,16 @@ def equity_report_settings(settings):
         checked['public_assistance'] = assistance
     else:
         checked['public_assistance'] = None
+
+    basis = checked['basis_risk']
+    if basis:
+        basis = {} if basis is True else basis
+        section = f"{SETTINGS_KEY}.basis_risk"
+        _check_keys(section, basis, BASIS_RISK_DEFAULTS)
+        basis = {**BASIS_RISK_DEFAULTS, **basis}
+        for name in BASIS_RISK_DEFAULTS:
+            _positive(section, name, basis[name], allow_zero=True)
+        checked['basis_risk'] = basis
+    else:
+        checked['basis_risk'] = None
     return checked

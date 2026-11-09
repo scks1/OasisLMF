@@ -18,43 +18,11 @@ import logging
 import numpy as np
 import pandas as pd
 
-from ..utils.exceptions import OasisException
-from .ord import ord_path, read_ord
+from .events import event_losses
 from .rows import by_group, suppress_small_groups
-from .sharing import perspective_rows, summary_id_map
 from .weighting import losses_at_return_periods
 
 logger = logging.getLogger(__name__)
-
-EVENT_KEYS = ['Period', 'EventId', 'SampleId', 'SummaryId']
-
-
-def _event_losses(output_dir, runtype, summary_set, source, sample_type, id_map=None):
-    """Return the losses of each event, sample and (ground-up) summary id, and the weight of each period."""
-    if source == 'sample':
-        plt = read_ord(output_dir, runtype, summary_set, 'splt', needed_for='Public assistance (plt_sample)')
-        # the SPLT also holds the analytical mean as sample -1
-        plt = plt[plt['SampleId'] > 0]
-    else:
-        plt = read_ord(output_dir, runtype, summary_set, 'mplt', needed_for='Public assistance (plt_moment)')
-        plt = plt[plt['SampleType'] == sample_type].rename(columns={'MeanLoss': 'Loss'}).assign(SampleId=0)
-    weights = plt.groupby('Period')['PeriodWeight'].first()
-    if id_map is not None:
-        plt = plt.assign(SummaryId=plt['SummaryId'].map(id_map)).dropna(subset=['SummaryId'])
-        plt['SummaryId'] = plt['SummaryId'].astype('int64')
-    return plt.groupby(EVENT_KEYS)['Loss'].sum(), weights
-
-
-def _loss_source(output_dir, settings, sets, has_il, analysis_settings):
-    samples = (analysis_settings or {}).get('number_of_samples')
-    have_splt = ord_path(output_dir, 'gul', sets['gul'], 'splt') and (
-        not has_il or ord_path(output_dir, 'il', sets['il'], 'splt'))
-    if have_splt and isinstance(samples, int) and samples > 0:
-        return 'sample', samples
-    logger.info("public assistance: applying the programme to each event's mean loss (MPLT), which understates what "
-                "a programme with a deductible or limit pays; turn on plt_sample for every perspective used, with "
-                "number_of_samples set, to apply it to each sample")
-    return 'mean', 1
 
 
 def assistance_tables(output_dir, settings, sample_type, analysis_settings=None):
@@ -86,28 +54,12 @@ def assistance_tables(output_dir, settings, sample_type, analysis_settings=None)
         tuple: ``(group table, budget table)``.
     """
     programme = settings['public_assistance']
-    sets = settings['loss_sharing']['summary_sets'] if settings['loss_sharing'] else {
-        p: settings['summary_set'] for p in ('gul', 'il')}
-    gul = perspective_rows(output_dir, settings, 'gul', sets['gul'], sample_type)
-    try:
-        il = perspective_rows(output_dir, settings, 'il', sets['il'], sample_type)
-    except OasisException:
-        il = None
-        logger.info("public assistance: no il_S%s outputs, so every ground-up loss counts as retained", sets['il'])
-    id_map = None
-    if il is not None:
-        id_map = summary_id_map(gul, il)
-        if id_map is None:
-            raise OasisException(
-                "public assistance needs the gul and il summary sets to have the same rows (for example, both grouped "
-                "by LocNumber), so each row's retained loss is known")
-
-    source, samples = _loss_source(output_dir, settings, sets, il is not None, analysis_settings)
-    gul_losses, weights = _event_losses(output_dir, 'gul', sets['gul'], source, sample_type)
-    retained = gul_losses
-    if il is not None:
-        il_losses, _ = _event_losses(output_dir, 'il', sets['il'], source, sample_type, id_map)
-        retained = gul_losses.sub(il_losses, fill_value=0.0).clip(lower=0.0)
+    losses = event_losses(output_dir, settings, sample_type, analysis_settings, 'public assistance', require_il=False,
+                          nonlinear_note='which understates what a programme with a deductible or limit pays')
+    gul, weights, samples = losses['rows'], losses['weights'], losses['samples']
+    retained = losses['gul']
+    if losses['il'] is not None:
+        retained = losses['gul'].sub(losses['il'], fill_value=0.0).clip(lower=0.0)
 
     eligible = pd.Series(True, index=gul['SummaryId'].to_numpy())
     if programme['income_threshold'] is not None:
