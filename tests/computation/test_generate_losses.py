@@ -177,6 +177,37 @@ class TestGenLosses(ComputationChecker):
 
         assert summary_info_csv == EXPECTED_SUMMARY_INFO_CSV
 
+    def test_losses__summary_info__exposure_attributes(self):
+        user_data_dir = self.tmp_dirs.get('user_data_dir').name
+        with open(os.path.join(user_data_dir, 'postcodes.csv'), 'w') as f:
+            f.write("PostalCode,IncomeQuintile,SVIBand\nLE13 0HL,2,high\nAB1 1AA,5,low\n")
+        OED_SETTINGS = {
+            **MIN_RUN_SETTINGS,
+            'exposure_attributes': [{'file': 'postcodes.csv', 'join_on': ['PostalCode'], 'columns': ['IncomeQuintile']}],
+            'gul_summaries': [
+                {**MIN_RUN_SETTINGS['gul_summaries'][0], 'id': 1, 'oed_fields': ['IncomeQuintile']},
+                {**MIN_RUN_SETTINGS['gul_summaries'][0], 'id': 2, 'oed_fields': ['LocNumber', 'IncomeQuintile']},
+            ],
+        }
+        self.write_json(self.tmp_files.get('analysis_settings_json'), OED_SETTINGS)
+        self.manager.generate_files(**self.args_gen_files_gul)
+        with patch.dict(os.environ, {"OASIS_SOCKET_SERVER_PORT": "10023"}):
+            self.manager.generate_losses(**self.min_args, user_data_dir=user_data_dir)
+
+        output_dir = os.path.join(self.tmp_dirs.get('model_run_dir').name, 'output')
+        assert self.read_file(os.path.join(output_dir, 'gul_S1_summary-info.csv')) == b'summary_id,IncomeQuintile,tiv\n1,2,220000.0\n'
+        assert self.read_file(os.path.join(output_dir, 'gul_S2_summary-info.csv')) == (
+            b'summary_id,LocNumber,IncomeQuintile,tiv\n1,10002082046,2,220000.0\n')
+
+    def test_losses__exposure_attributes_missing_file__exception_raised(self):
+        OED_SETTINGS = {**MIN_RUN_SETTINGS, 'exposure_attributes': {'file': 'no-such-table.csv', 'join_on': 'PostalCode'}}
+        self.write_json(self.tmp_files.get('analysis_settings_json'), OED_SETTINGS)
+        self.manager.generate_files(**self.args_gen_files_gul)
+        with (self.assertRaises(OasisException) as context,
+              patch.dict(os.environ, {"OASIS_SOCKET_SERVER_PORT": "10024"})):
+            self.manager.generate_losses(**self.min_args)
+        self.assertIn("exposure attribute table 'no-such-table.csv' not found", str(context.exception))
+
     def test_losses__run_il(self):
         self.manager.generate_files(**self.args_gen_files_il)
         run_settings = self.tmp_files.get('analysis_settings_json')

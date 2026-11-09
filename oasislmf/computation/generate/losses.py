@@ -35,6 +35,7 @@ from oasis_data_manager.filestore.backends.local import LocalStorage
 from ...execution import bash, runner
 from ...pytools.common.run_types import RUNTYPE_GROUNDUP_LOSS, RUNTYPE_INSURED_LOSS, RUNTYPE_REINSURANCE_LOSS
 from ...execution.bin import OPTIONAL_MODEL_SETS, move_bin, prepare_run_directory, prepare_run_inputs
+from ...preparation.exposure_attributes import attach_exposure_attributes, exposure_attribute_tables
 from ...preparation.summaries import generate_summaryxref_files, get_ri_summaryxref_dirs
 from ...pytools.fm.financial_structure import create_financial_structure
 from ...pytools.fm.manager import run as fmpy_run
@@ -287,6 +288,11 @@ class GenerateLossesDir(GenerateLossesBase):
 
         exposure_data = get_exposure_data(self, add_internal_col=True)
         location_df = exposure_data.get_subject_at_risk_source().dataframe
+        location_df = attach_exposure_attributes(
+            location_df,
+            exposure_attribute_tables(self.settings),
+            search_dirs=[self.user_data_dir, self.analysis_settings_json and os.path.dirname(os.path.abspath(self.analysis_settings_json))],
+        )
         account_df = exposure_data.account.dataframe if exposure_data.account else None
         generate_summaryxref_files(
             location_df,

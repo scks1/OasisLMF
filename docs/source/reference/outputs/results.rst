@@ -695,6 +695,43 @@ ORD Outputs
 
 **Summary-info File**: In addition to the requested output files, a summary-info file will be produced for each perspective-level combination to allow mapping from the summary_id values in the output file(s) back to the original OED field combinations requested
 
+.. _exposure_attributes:
+
+Grouping by attributes from another table
+*****************************************
+
+.. versionadded:: NEXT
+
+A summary set can group by fields that are not in the OED files, for example an income band or a social
+vulnerability index per postcode. List one or more tables under ``exposure_attributes`` in the analysis settings.
+Each table is joined to the locations on ``join_on``, and its columns can then be used in ``oed_fields`` like any
+location field. They are also written to the summary-info file.
+
+.. code-block:: json
+
+    "exposure_attributes": [
+        {
+            "file": "postcode_deprivation.csv",
+            "join_on": ["PostalCode"],
+            "columns": ["IncomeQuintile"],
+            "default": {"IncomeQuintile": "Unknown"}
+        }
+    ],
+    "gul_summaries": [
+        {"id": 1, "oed_fields": ["IncomeQuintile"], "ord_output": {"alt_period": true}}
+    ]
+
+- ``file``: a csv or parquet file. A relative path is looked for in the user data directory (``--user-data-dir``),
+  then next to the analysis settings file, then in the working directory.
+- ``join_on``: the location field(s) to match on. Surrounding spaces are ignored, and a numeric location field is
+  matched by number, so ``20`` and ``20.0`` are the same. Each location can match at most one row of the table;
+  a table with repeated ``join_on`` values is rejected.
+- ``columns`` (optional): the columns to take from the table. Defaults to every column other than ``join_on``. A
+  column can't have the same name as a location field.
+- ``default`` (optional): the value given to locations with no row in the table, per column. Without one, those
+  locations are left blank and grouped as ``0``, the same as a blank OED field. The number of unmatched locations is
+  logged as a warning.
+
 
 .. _standard_outputs:
 
