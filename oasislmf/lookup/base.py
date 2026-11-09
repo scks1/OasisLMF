@@ -22,6 +22,28 @@ from oasis_data_manager.filestore.config import get_storage_from_config, LocalSt
 
 UNKNOWN_ID = -1
 
+# Other spellings a lookup may use for the 'area_peril_id' column. 'areaperil_id' is the
+# spelling of the model files (e.g. hazard_case.parquet), see #2216.
+AREA_PERIL_ID_ALIASES = ('areaperil_id',)
+
+
+def with_area_peril_id(df):
+    """Rename a lookup's areaperil column to 'area_peril_id' if it uses another spelling.
+
+    Args:
+        df (pd.DataFrame): lookup results.
+
+    Returns:
+        pd.DataFrame: ``df`` unchanged if it has an 'area_peril_id' column or no alias of it,
+        otherwise a copy with the first alias found renamed 'area_peril_id'.
+    """
+    if 'area_peril_id' in df.columns:
+        return df
+    for alias in AREA_PERIL_ID_ALIASES:
+        if alias in df.columns:
+            return df.rename(columns={alias: 'area_peril_id'})
+    return df
+
 
 ''' Basic abstract classes that facilitate the implementation of KeyLookupInterface
 '''

@@ -60,6 +60,13 @@ The return JSON should subscribe to the following definition:
     "message": <message to accompany status>
     }
 
+The areaperil column can also be called ``areaperil_id``, the spelling used by the model files such as
+``hazard_case.parquet``; it is renamed ``area_peril_id`` before the keys file is written. If a lookup returns both,
+``area_peril_id`` is used.
+
+.. versionchanged:: NEXT
+    ``areaperil_id`` is accepted as well as ``area_peril_id``.
+
 |
 
 Perils Covered
