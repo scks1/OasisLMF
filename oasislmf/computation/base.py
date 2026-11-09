@@ -17,6 +17,12 @@ from ..utils.inputs import update_config, str2bool, has_oasis_env, get_oasis_env
 from oasislmf.utils.log import oasis_log
 from ..utils.log_config import OasisLogConfig
 
+logger = logging.getLogger(__name__)
+
+# Roles a caller can give to the 'computation_settings' read from settings files, see
+# ComputationStep.get_arguments
+COMPUTATION_SETTINGS_USER_ROLES = ['admin', 'user']
+
 
 class ComputationStep:
     """"Abstract" Class for all Computation Step (ExposurePreAnalysis, GulCalc, ...)
@@ -39,11 +45,15 @@ class ComputationStep:
     # 'config' is the exception: it mirrors the CLI's -C/--config MDK config file path
     # (needed so _apply_log_config() can re-read its "logging" block), not something an
     # analysis settings file should be able to set, so it's excluded from the schema.
+    # 'computation_settings_user_role' is excluded for the same reason: it says how far
+    # the settings files can be trusted, so they must not be able to set it themselves.
     global_params = [
         {'name': 'verbose', 'default': False},
         {'name': 'log_level', 'choices': OasisLogConfig.STANDARD_LEVELS},
         {'name': 'log_format', 'choices': list(OasisLogConfig.FORMAT_TEMPLATES.keys())},
         {'name': 'config', 'exclude_from_schema': True},
+        {'name': 'computation_settings_user_role', 'default': 'admin', 'choices': COMPUTATION_SETTINGS_USER_ROLES,
+         'exclude_from_schema': True},
     ]
 
     def __init__(self, **kwargs):
@@ -186,30 +196,72 @@ class ComputationStep:
 
     @classmethod
     def get_arguments(cls, **kwargs):
-        """Return a list of default arguments values for the functions parameters
-        If given arg values in 'kwargs' these will override the defaults
+        """Return the argument values for the step's parameters.
+
+        Values come from the parameter defaults, then from ``kwargs`` (or ``OASIS_<NAME>``
+        environment variables when ``OASIS_ENV_OVERRIDE`` is set), then from the
+        ``computation_settings`` block of any settings file given in ``kwargs``.
+
+        ``computation_settings_user_role`` (in ``kwargs``) says what that block may change:
+
+        - ``'admin'`` (the default): it can change any parameter, including values given in
+          ``kwargs``.
+        - ``'user'``: it can only change parameters left at their defaults; values given in
+          ``kwargs`` (other than None) or by environment override are kept. A platform can
+          use this for requests from users who aren't staff.
+
+        Parameters marked ``exclude_from_schema`` (such as ``config`` and the role itself)
+        can never be set by ``computation_settings``.
+
+        Args:
+            **kwargs: argument values, by parameter name.
+
+        Returns:
+            dict: the value of each parameter, by name.
         """
         func_args = {el['name']: el.get('default', None) for el in cls.get_params()}
         type_map = {el['name']: el.get('type', None) for el in cls.get_params()}
+        not_settable = {el['name'] for el in cls.get_params() if el.get('exclude_from_schema')}
 
         func_kwargs = update_config(kwargs)
         env_override = str2bool(os.getenv('OASIS_ENV_OVERRIDE', default=False))
 
+        set_by_caller = set()
         for param in func_args:
             if env_override and has_oasis_env(param):
                 func_args[param] = get_oasis_env(param, type_map[param])
+                set_by_caller.add(param)
             elif param in func_kwargs:
                 func_args[param] = func_kwargs[param]
+                if func_kwargs[param] is not None:
+                    set_by_caller.add(param)
+
+        user_role = func_args.get('computation_settings_user_role') or 'admin'
+        if user_role not in COMPUTATION_SETTINGS_USER_ROLES:
+            raise OasisException(
+                f"computation_settings_user_role must be one of {COMPUTATION_SETTINGS_USER_ROLES}, not {user_role!r}")
 
         computation_settings = Settings()
-        computation_settings.add_settings(func_args, ROOT_USER_ROLE)
+        if user_role == 'admin':
+            computation_settings.add_settings(func_args, ROOT_USER_ROLE)
+            protected = set()
+        else:
+            protected = set_by_caller | not_settable
+            computation_settings.add_settings({k: v for k, v in func_args.items() if k not in protected})
+            computation_settings.add_settings({k: v for k, v in func_args.items() if k in protected}, ROOT_USER_ROLE)
+
         for settings_info in cls.get_params(param_type="settings"):
             setting_fp = func_args.get(settings_info["name"])
             if setting_fp and pathlib.Path(setting_fp).exists():
                 new_settings = settings_info["loader"](setting_fp)
-                computation_settings.add_settings(
-                    new_settings.pop("computation_settings", {}), {'admin'}
-                )
+                file_settings = new_settings.pop("computation_settings", {})
+                ignored = sorted((not_settable | protected).intersection(file_settings))
+                if ignored:
+                    logger.warning(
+                        "computation_settings in '%s': ignoring %s, which can't be set from a settings file%s",
+                        setting_fp, ignored, "" if user_role == 'admin' else " by the 'user' role")
+                    file_settings = {k: v for k, v in file_settings.items() if k not in ignored}
+                computation_settings.add_settings(file_settings, ROOT_USER_ROLE if user_role == 'admin' else {user_role})
         return computation_settings.get_settings()
 
     @classmethod

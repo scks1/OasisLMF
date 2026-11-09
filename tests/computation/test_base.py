@@ -5,6 +5,7 @@ import os
 import pytest
 
 from oasislmf.computation.base import ComputationStep
+from oasislmf.utils.exceptions import OasisException
 from oasislmf.utils.log_config import OasisLogConfig
 
 
@@ -214,3 +215,83 @@ def test_computation_settings_json_schema():
     assert properties['some_choice'] == {'type': 'string', 'enum': ['a', 'b']}
     assert properties['some_count'] == {'type': 'integer'}
     assert properties['some_ratio'] == {'type': 'number'}
+
+
+def _load_json(fp):
+    with open(fp) as f:
+        return json.load(f)
+
+
+class DummySettingsStep(DummyComputationStep):
+    step_params = [
+        {'name': 'num_processes', 'type': int, 'default': 1},
+        {'name': 'run_dir', 'default': None},
+        {'name': 'settings_json', 'is_path': True},
+    ]
+    settings_params = [{'name': 'settings_json', 'loader': _load_json}]
+
+
+@pytest.fixture
+def settings_file(tmp_path):
+    def write(computation_settings):
+        path = tmp_path / 'analysis_settings.json'
+        path.write_text(json.dumps({'computation_settings': computation_settings}))
+        return str(path)
+    return write
+
+
+def test_get_arguments_admin_computation_settings_override_everything(settings_file):
+    """The default role keeps the old behaviour: the settings file wins over kwargs."""
+    fp = settings_file({'num_processes': 8, 'run_dir': '/elsewhere'})
+    args = DummySettingsStep.get_arguments(settings_json=fp, run_dir='/runs/1')
+    assert args['num_processes'] == 8
+    assert args['run_dir'] == '/elsewhere'
+
+
+def test_get_arguments_user_computation_settings_only_change_defaults(settings_file, caplog):
+    """With the 'user' role, values the caller passed are kept; defaults can still be changed (#1819)."""
+    fp = settings_file({'num_processes': 8, 'run_dir': '/elsewhere'})
+    with caplog.at_level(logging.WARNING, logger='oasislmf.computation.base'):
+        args = DummySettingsStep.get_arguments(settings_json=fp, run_dir='/runs/1', computation_settings_user_role='user')
+    assert args['num_processes'] == 8
+    assert args['run_dir'] == '/runs/1'
+    assert "ignoring ['run_dir']" in caplog.text
+    assert "by the 'user' role" in caplog.text
+
+
+def test_get_arguments_user_role_treats_none_kwargs_as_unset(settings_file):
+    """OasisManager passes every parameter, unset ones as None: those stay changeable."""
+    fp = settings_file({'run_dir': '/elsewhere'})
+    args = DummySettingsStep.get_arguments(settings_json=fp, run_dir=None, computation_settings_user_role='user')
+    assert args['run_dir'] == '/elsewhere'
+
+
+def test_get_arguments_user_role_keeps_env_override(settings_file, monkeypatch):
+    monkeypatch.setenv('OASIS_ENV_OVERRIDE', 'True')
+    monkeypatch.setenv('OASIS_NUM_PROCESSES', '4')
+    fp = settings_file({'num_processes': 8})
+    args = DummySettingsStep.get_arguments(settings_json=fp, computation_settings_user_role='user')
+    assert args['num_processes'] == 4
+
+
+@pytest.mark.parametrize('role', ['admin', 'user'])
+def test_get_arguments_settings_file_cannot_set_its_own_role_or_config(settings_file, role, caplog):
+    """'computation_settings_user_role' and 'config' (exclude_from_schema) can't come from the file."""
+    fp = settings_file({'computation_settings_user_role': 'admin', 'config': 'other.json', 'run_dir': '/elsewhere'})
+    with caplog.at_level(logging.WARNING, logger='oasislmf.computation.base'):
+        args = DummySettingsStep.get_arguments(settings_json=fp, run_dir='/runs/1', computation_settings_user_role=role)
+    assert args['computation_settings_user_role'] == role
+    assert args['config'] is None
+    assert args['run_dir'] == ('/elsewhere' if role == 'admin' else '/runs/1')
+    assert "'computation_settings_user_role'" in caplog.text and "'config'" in caplog.text
+
+
+def test_get_arguments_rejects_unknown_role(settings_file):
+    with pytest.raises(OasisException, match="computation_settings_user_role must be one of"):
+        DummySettingsStep.get_arguments(settings_json=settings_file({}), computation_settings_user_role='staff')
+
+
+def test_computation_settings_user_role_not_in_schema():
+    properties = DummySettingsStep.get_computation_settings_json_schema()['properties']
+    assert 'computation_settings_user_role' not in properties
+    assert 'num_processes' in properties
