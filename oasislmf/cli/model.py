@@ -114,6 +114,17 @@ class RunPostAnalysisCmd(OasisComputationCommand):
     computation_name = 'PostAnalysis'
 
 
+class EquityReportCmd(OasisComputationCommand):
+    """Report how the losses of a finished analysis fall on different groups.
+
+    Reads the ORD outputs of the run and the ``equity_report`` section of the analysis settings. The command line
+    arguments can be supplied in the configuration file (``oasislmf.json`` by default or specified with the
+    ``--config`` flag).
+    """
+    formatter_class = RawDescriptionHelpFormatter
+    computation_name = 'EquityReport'
+
+
 class GenerateComputationSettingsJsonSchema(OasisComputationCommand):
     """Generate a json schema to validate the computation settings part of oed settings"""
     formatter_class = RawDescriptionHelpFormatter
@@ -129,6 +140,7 @@ class ModelCmd(OasisBaseCommand):
     * generating deterministic losses (no model)
     * running a model end-to-end
     * checking a portfolio and model data work together
+    * reporting how the losses fall on different groups
     """
     sub_commands = {
         'generate-exposure-pre-analysis': GenerateExposurePreAnalysisCmd,
@@ -144,4 +156,5 @@ class ModelCmd(OasisBaseCommand):
         'run': RunCmd,
         'check': CheckCmd,
         'run-postanalysis': RunPostAnalysisCmd,
+        'equity-report': EquityReportCmd,
     }

@@ -18,4 +18,5 @@ produce these outputs are documented under {doc}`../kernel/index`
 :maxdepth: 2
 
 results
+equity-report
 ```

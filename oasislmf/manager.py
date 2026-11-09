@@ -26,6 +26,7 @@ from oasislmf.computation.run.generate_losses import GenerateOasisLosses
 from oasislmf.computation.run.generate_documentation import GenerateDocumentation
 from oasislmf.computation.run.model import RunModel, GenerateComputationSettingsJsonSchema
 from oasislmf.computation.run.check import CheckModel
+from oasislmf.computation.run.equity import EquityReport
 from oasislmf.computation.run.platform import (PlatformDelete, PlatformGet,
                                                PlatformPost,
                                                PlatformList, PlatformRun,
@@ -64,6 +65,7 @@ class OasisManager(object):
         CheckModel,
         GenerateComputationSettingsJsonSchema,
         PostAnalysis,
+        EquityReport,
         RunExposure,
         RunFmTest,
         PlatformList,
