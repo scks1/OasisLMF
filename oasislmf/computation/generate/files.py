@@ -122,7 +122,7 @@ class GenerateFiles(ComputationStep):
         {'name': 'profile_fm_agg', 'default': get_default_fm_aggregation_profile()},
         {'name': 'location', 'type': str, 'nargs': '+', 'help': 'A set of locations to include in the files'},
         {'name': 'portfolio', 'type': str, 'nargs': '+', 'help': 'A set of portfolios to include in the files'},
-        {'name': 'account', 'type': str, 'nargs': '+', 'help': 'A set of locations to include in the files'},
+        {'name': 'account', 'type': str, 'nargs': '+', 'help': 'A set of accounts to include in the files'},
         {'name': 'base_df_engine', 'type': str, 'default': 'oasis_data_manager.df_reader.reader.OasisPandasReader',
          'help': 'The default dataframe reading engine to use when loading files'},
         {'name': 'exposure_df_engine', 'type': str, 'default': None,

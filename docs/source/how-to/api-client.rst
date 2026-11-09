@@ -185,9 +185,9 @@ Key options:
      - OED location file
    * - ``-y / --oed-accounts-csv``
      - OED accounts file (optional)
-   * - ``-i / --oed-info-csv``
+   * - ``-i / --oed-info-csv / --ri-info``
      - Reinsurance info file (optional)
-   * - ``-s / --oed-scope-csv``
+   * - ``-s / --oed-scope-csv / --ri-scope``
      - Reinsurance scope file (optional)
    * - ``-a / --analysis-settings-json``
      - Analysis settings JSON
@@ -203,6 +203,11 @@ Key options:
      - Number of loss-generation chunks for ``v2`` runs
    * - ``--lookup-chunks N``
      - Number of input-generation chunks for ``v2`` runs
+
+.. versionchanged:: NEXT
+   ``--ri-info`` and ``--ri-scope`` are accepted by every command that takes the reinsurance
+   files, matching ``ods_tools check``. ``--location`` and ``--account`` still filter the
+   exposure rather than naming the files; use ``-x`` and ``-y`` for those.
 
 |
 
